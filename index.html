@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Pixel Cloud</title>
+	<style>
+		html, body {
+			margin: 0;
+			padding: 0;
+			overflow: hidden;
+		}
+		#stage {
+
+		}
+		rect {
+			cursor: pointer;
+			fill: currentColor;
+			stroke: currentColor;
+			stroke-width: 0;
+			transition: all 0.25s;
+		}
+		rect:hover {
+			stroke-width: 10px;
+			z-index: 99;
+		}
+	</style>
+</head>
+<body>
+	<div id="stage"></div>
+	<script>
+
+
+		function shuffleArray(array) {
+    		for (var i = array.length - 1; i > 0; i--) {
+        		var j = Math.floor(Math.random() * (i + 1));
+        		var temp = array[i];
+        		array[i] = array[j];
+        		array[j] = temp;
+    		}
+
+    		return array;
+		}
+
+		function generateUID() {
+			var chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXTZabcdefghiklmnopqrstuvwxyz';
+			var uid = '';
+
+			for (var i=0; i<32; i++) {
+				uid += chars.charAt(Math.round(Math.random()*(chars.length-1)));
+			}
+	
+			return uid;
+		}
+
+		function getRandomColorHex() {
+			var letters = '0123456789ABCDEF'.split('');
+			var color = '#';
+			for (var i = 0; i < 6; i++ ) {
+				color += letters[Math.round(Math.random() * 15)];
+			}
+			return color;
+		}
+
+		var minimumParticleSize = 32;
+		var maximumParticleSize = window.innerWidth / 10;
+
+		var canvas;
+		var context;
+		var stage = document.getElementById('stage');
+		var stageWidth = window.innerWidth;
+		var stageHeight = window.innerHeight;
+		var dataArray = [];
+
+		function buildCanvas() {
+			var canvas = document.createElement("canvas");
+				canvas.id = "canvas";
+				canvas.setAttribute("width", stageWidth);
+				canvas.setAttribute("height", stageHeight);
+				stage.appendChild(canvas);
+				context = canvas.getContext("2d");
+				backingStoreRatio = context.webkitBackingStorePixelRatio ||
+                            context.mozBackingStorePixelRatio ||
+                            context.msBackingStorePixelRatio ||
+                            context.oBackingStorePixelRatio ||
+                            context.backingStorePixelRatio || 1,
+
+        		ratio = devicePixelRatio / backingStoreRatio;
+
+        		if (devicePixelRatio !== backingStoreRatio) {
+        			var oldWidth = canvas.width;
+        			var oldHeight = canvas.height;
+
+        			canvas.width = oldWidth * ratio;
+        			canvas.height = oldHeight * ratio;
+
+			        canvas.style.width = oldWidth + 'px';
+        			canvas.style.height = oldHeight + 'px';
+        			context.scale(ratio, ratio);
+        		}
+		}
+
+		function prefillArray() {
+			return [{color: '#367223', id: 7827, title: 'title', message: 'message 2'}];
+		}
+
+		function generateSlots(max) {
+			var arr = [];
+			var slotCount = 1000;
+			var i = 0;
+
+			var rowsMax = Math.floor(stageHeight / minimumParticleSize);
+			var colsMax = Math.floor(stageWidth / minimumParticleSize);
+			var rowsMin = Math.floor(stageHeight / maximumParticleSize);
+			var colsMin = Math.floor(stageWidth / maximumParticleSize);
+			while (i < rowsMax) {
+				var j = 0;
+				while (j < colsMax) {
+					var element = [j, i];
+					arr.push(element);
+					++j;
+				}
+				++i;
+			}
+
+			return arr;
+		}
+
+		function fillStage(arr) {
+			if (arr === undefined) {
+				arr = prefillArray();
+			}
+			var placementArray = generateSlots(arr.length);
+			placementArray = shuffleArray(placementArray);
+
+			var i = 0;
+			while (i < placementArray.length) {
+				var slot = {};
+				slot.color = getRandomColorHex();
+				slot.id = i;
+				slot.title = "particle" + i;
+				slot.message = generateUID;
+				var position = placementArray[i];
+				var posX = position[0];
+				var posY = position[1];
+				renderParticle(posX, posY, minimumParticleSize, slot);
+				++i;
+			}
+		}
+
+		function renderParticle(x, y, size, data) {
+			context.fillStyle = data.color;
+			context.beginPath();
+			context.rect(x*size,y*size,size,size);
+			context.fill();
+		}
+
+		function load() {
+			buildCanvas();
+			fillStage();
+		}
+		window.onload = load;
+
+	</script>
+</body>
+
+</html>
