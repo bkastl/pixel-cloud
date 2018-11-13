@@ -9,9 +9,6 @@
 			padding: 0;
 			overflow: hidden;
 		}
-		#stage {
-
-		}
 		rect {
 			cursor: pointer;
 			fill: currentColor;
@@ -29,6 +26,9 @@
 	<div id="stage"></div>
 	<script>
 
+		/*Daten menge checken und daraus die minimale Größe ableiten*/
+
+		/* Wenn Datengröße größer als min Partikel Size > Canvas entsprechend skalieren*/
 
 		function shuffleArray(array) {
     		for (var i = array.length - 1; i > 0; i--) {
@@ -61,15 +61,37 @@
 			return color;
 		}
 
+		function getRandomRGBString() {
+ 			var o = Math.round, r = Math.random, s = 255;
+    		return o(r()*s) + ',' + o(r()*s) + ',' + o(r()*s);
+		}
+
 		var minimumParticleSize = 32;
 		var maximumParticleSize = window.innerWidth / 10;
+
+		var currentParticleSize = minimumParticleSize;
+
+		var animationDuration = 240; //animation duration in frames
 
 		var canvas;
 		var context;
 		var stage = document.getElementById('stage');
 		var stageWidth = window.innerWidth;
 		var stageHeight = window.innerHeight;
+
+		var rowsMax;
+		var rowsMin;
+		var colsMax;
+		var rowsMax;
+
+		stageWidth = window.innerWidth + currentParticleSize / 2;
+		stageHeight = window.innerHeight + currentParticleSize / 2;
+		
 		var dataArray = [];
+		var animateArray = [];
+		var dataPositionObject = {};
+		var tick;
+		var startAnimationFrame = 0;
 
 		function buildCanvas() {
 			var canvas = document.createElement("canvas");
@@ -97,21 +119,38 @@
         			canvas.style.height = oldHeight + 'px';
         			context.scale(ratio, ratio);
         		}
+        		stage.style.marginLeft = "-" + currentParticleSize / 2 + "px";
+        		stage.style.marginTop = "-" + currentParticleSize / 2 + "px";
+
 		}
 
-		function prefillArray() {
-			return [{color: '#367223', id: 7827, title: 'title', message: 'message 2'}];
+		function prefillArray(count) {
+			var dataArray = {};
+			var i = 0;
+			while (i < count) {
+				dataArray[i] = {};
+				dataArray[i].color = getRandomRGBString();
+				dataArray[i].id = i;
+				dataArray[i].speed = Math.random() * (animationDuration/2000 - 0);
+				dataArray[i].title = "particle" + i;
+				dataArray[i].message = generateUID();
+
+				++i;
+			}
+
+			return dataArray;
 		}
 
 		function generateSlots(max) {
 			var arr = [];
-			var slotCount = 1000;
+
 			var i = 0;
 
-			var rowsMax = Math.floor(stageHeight / minimumParticleSize);
-			var colsMax = Math.floor(stageWidth / minimumParticleSize);
-			var rowsMin = Math.floor(stageHeight / maximumParticleSize);
-			var colsMin = Math.floor(stageWidth / maximumParticleSize);
+			rowsMax = Math.ceil(stageHeight / minimumParticleSize);
+			colsMax = Math.ceil(stageWidth / minimumParticleSize);
+			rowsMin = Math.ceil(stageHeight / maximumParticleSize);
+			colsMin = Math.ceil(stageWidth / maximumParticleSize);
+		
 			while (i < rowsMax) {
 				var j = 0;
 				while (j < colsMax) {
@@ -122,33 +161,70 @@
 				++i;
 			}
 
+			console.log(arr.length)
+
 			return arr;
 		}
 
 		function fillStage(arr) {
+
 			if (arr === undefined) {
-				arr = prefillArray();
+				arr = prefillArray(2500);
 			}
 			var placementArray = generateSlots(arr.length);
 			placementArray = shuffleArray(placementArray);
 
+
 			var i = 0;
 			while (i < placementArray.length) {
-				var slot = {};
-				slot.color = getRandomColorHex();
-				slot.id = i;
-				slot.title = "particle" + i;
-				slot.message = generateUID;
+
+
 				var position = placementArray[i];
+				
 				var posX = position[0];
 				var posY = position[1];
-				renderParticle(posX, posY, minimumParticleSize, slot);
+
+				var slot;
+
+				slot = arr[i];
+				if (slot !== undefined) {
+					placementArray[i].push(slot.id);
+					dataPositionObject[posX + "." + posY] = slot.id;
+				}
+				if (slot !== undefined) {
+					renderParticle(posX, posY, currentParticleSize, slot.color, 0);
+					animateArray.push([posX, posY, slot.color, slot.speed]);
+				}
 				++i;
+			}
+
+		}
+
+		function animateStage() {
+
+			tick = requestAnimationFrame(innerTick);
+			
+		}
+
+		function innerTick() {
+			var j = 0;
+			context.clearRect(0, 0, stageWidth, stageHeight);	
+			while (j < animateArray.length) {
+				renderParticle(animateArray[j][0], animateArray[j][1], currentParticleSize, animateArray[j][2], 0+animateArray[j][3]*startAnimationFrame, 1);
+				++j;
+			}
+			++startAnimationFrame;
+			if (startAnimationFrame < animationDuration) {
+				tick = requestAnimationFrame(innerTick);
+			}
+			else {
+				cancelAnimationFrame(tick);
+				tick = null;
 			}
 		}
 
-		function renderParticle(x, y, size, data) {
-			context.fillStyle = data.color;
+		function renderParticle(x, y, size, color, opacity) {
+			context.fillStyle = "rgba("+ color + "," + opacity + ")";
 			context.beginPath();
 			context.rect(x*size,y*size,size,size);
 			context.fill();
@@ -157,6 +233,7 @@
 		function load() {
 			buildCanvas();
 			fillStage();
+			animateStage();
 		}
 		window.onload = load;
 
