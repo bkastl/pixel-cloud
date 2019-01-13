@@ -4,21 +4,21 @@
 	<meta charset="UTF-8">
 	<title>Pixel Cloud</title>
 	<style>
+		* {
+			margin: 0;
+			padding: 0;
+		}
 		html, body {
 			margin: 0;
 			padding: 0;
 			overflow: hidden;
 		}
-		rect {
-			cursor: pointer;
-			fill: currentColor;
-			stroke: currentColor;
-			stroke-width: 0;
-			transition: all 0.25s;
-		}
-		rect:hover {
-			stroke-width: 10px;
-			z-index: 99;
+		#stage {
+			overflow-x: hidden;
+			overflow-y: auto;
+			height: 100vh;
+			width: 100vw;
+			font-size: 0;
 		}
 	</style>
 </head>
@@ -26,19 +26,15 @@
 	<div id="stage"></div>
 	<script>
 
-		/*Daten menge checken und daraus die minimale Größe ableiten*/
-
-		/* Wenn Datengröße größer als min Partikel Size > Canvas entsprechend skalieren*/
-
 		function shuffleArray(array) {
-    		for (var i = array.length - 1; i > 0; i--) {
-        		var j = Math.floor(Math.random() * (i + 1));
-        		var temp = array[i];
-        		array[i] = array[j];
-        		array[j] = temp;
-    		}
+			for (var i = array.length - 1; i > 0; i--) {
+				var j = Math.floor(Math.random() * (i + 1));
+				var temp = array[i];
+				array[i] = array[j];
+				array[j] = temp;
+			}
 
-    		return array;
+			return array;
 		}
 
 		function generateUID() {
@@ -62,16 +58,33 @@
 		}
 
 		function getRandomRGBString() {
- 			var o = Math.round, r = Math.random, s = 255;
-    		return o(r()*s) + ',' + o(r()*s) + ',' + o(r()*s);
+			var o = Math.round, r = Math.random, s = 255;
+			return o(r()*s) + ',' + o(r()*s) + ',' + o(r()*s);
 		}
 
-		var minimumParticleSize = 32;
-		var maximumParticleSize = window.innerWidth / 10;
+		function getScrollbarWidth() {
+			var outer = document.createElement("div");
+			outer.style.visibility = "hidden";
+			outer.style.width = "100px";
+			outer.style.msOverflowStyle = "scrollbar"; // needed for WinJS apps
 
-		var currentParticleSize = minimumParticleSize;
+			document.body.appendChild(outer);
 
-		var animationDuration = 240; //animation duration in frames
+			var widthNoScroll = outer.offsetWidth;
+			outer.style.overflow = "scroll";
+
+			var inner = document.createElement("div");
+			inner.style.width = "100%";
+			outer.appendChild(inner);
+
+			var widthWithScroll = inner.offsetWidth;
+
+			outer.parentNode.removeChild(outer);
+
+			return widthNoScroll - widthWithScroll;
+		}
+
+		var animationDuration = 240; //animation duration in frames, 60 equals one second
 
 		var canvas;
 		var context;
@@ -79,52 +92,91 @@
 		var stageWidth = window.innerWidth;
 		var stageHeight = window.innerHeight;
 
-		var rowsMax;
-		var rowsMin;
-		var colsMax;
-		var rowsMax;
+		var minimumParticleSize = 32;
+		var maximumParticleSize = Math.floor(window.innerWidth / 10);
 
-		stageWidth = window.innerWidth + currentParticleSize / 2;
-		stageHeight = window.innerHeight + currentParticleSize / 2;
+		var availSpace = window.innerWidth * window.innerHeight;
+
+		var currentParticleSize = minimumParticleSize;
+
+		var rows;
+		var cols;
 		
 		var dataArray = [];
+		var dataArrayLength = Math.ceil(Math.random()*2500);
+		var bufferedArrayLength = dataArrayLength + 2;
 		var animateArray = [];
 		var dataPositionObject = {};
+		var addPosition;
 		var tick;
 		var startAnimationFrame = 0;
+
+		var debounceTimeout = 150;
+
+		function generateDimensions() {
+			var availSpace = stageWidth * stageHeight;
+			currentParticleSize = maximumParticleSize;
+			var requiredSpace = maximumParticleSize * maximumParticleSize * bufferedArrayLength;
+			while (requiredSpace > availSpace && currentParticleSize > minimumParticleSize) {
+				--currentParticleSize;
+				requiredSpace = currentParticleSize * currentParticleSize * bufferedArrayLength;
+			}
+
+			var exactColCount = Math.floor(stageWidth / currentParticleSize);
+
+			stageWidth = exactColCount * currentParticleSize;
+
+			var minimumRows = Math.floor(window.innerHeight / currentParticleSize);
+
+			if (((minimumRows - 1) * exactColCount) < bufferedArrayLength) {
+				if (getScrollbarWidth() > 0 && (stageWidth - (exactColCount * currentParticleSize)) > (currentParticleSize * 2)) {
+					stageWidth = stageWidth - currentParticleSize;
+					stageHeight = Math.ceil(bufferedArrayLength / (exactColCount - 1)) * currentParticleSize;
+				} else {
+					stageHeight = Math.ceil(bufferedArrayLength / exactColCount) * currentParticleSize;
+				}
+			} else {
+				stageHeight = window.innerHeight;	
+			}
+			
+
+			rows = Math.ceil(stageHeight / currentParticleSize);
+			cols = Math.ceil(stageWidth / currentParticleSize);
+
+		}
 
 		function buildCanvas() {
 			var canvas = document.createElement("canvas");
 				canvas.id = "canvas";
 				canvas.setAttribute("width", stageWidth);
 				canvas.setAttribute("height", stageHeight);
+				stage.innerHTML = "";
 				stage.appendChild(canvas);
 				context = canvas.getContext("2d");
 				backingStoreRatio = context.webkitBackingStorePixelRatio ||
-                            context.mozBackingStorePixelRatio ||
-                            context.msBackingStorePixelRatio ||
-                            context.oBackingStorePixelRatio ||
-                            context.backingStorePixelRatio || 1,
+							context.mozBackingStorePixelRatio ||
+							context.msBackingStorePixelRatio ||
+							context.oBackingStorePixelRatio ||
+							context.backingStorePixelRatio || 1,
 
-        		ratio = devicePixelRatio / backingStoreRatio;
+				ratio = devicePixelRatio / backingStoreRatio;
 
-        		if (devicePixelRatio !== backingStoreRatio) {
-        			var oldWidth = canvas.width;
-        			var oldHeight = canvas.height;
+				if (devicePixelRatio !== backingStoreRatio) {
+					var oldWidth = canvas.width;
+					var oldHeight = canvas.height;
 
-        			canvas.width = oldWidth * ratio;
-        			canvas.height = oldHeight * ratio;
+					canvas.width = oldWidth * ratio;
+					canvas.height = oldHeight * ratio;
 
-			        canvas.style.width = oldWidth + 'px';
-        			canvas.style.height = oldHeight + 'px';
-        			context.scale(ratio, ratio);
-        		}
-        		stage.style.marginLeft = "-" + currentParticleSize / 2 + "px";
-        		stage.style.marginTop = "-" + currentParticleSize / 2 + "px";
+					canvas.style.width = oldWidth + 'px';
+					canvas.style.height = oldHeight + 'px';
+					context.scale(ratio, ratio);
+				}
 
 		}
 
-		function prefillArray(count) {
+		function prefillArray(count, bufferElements) {
+
 			var dataArray = {};
 			var i = 0;
 			while (i < count) {
@@ -137,7 +189,18 @@
 
 				++i;
 			}
-
+			var j = 0;
+			while (j < bufferElements) {
+				dataArray[i] = {};
+				dataArray[i].color = '255,255,255';
+				dataArray[i].id = 'add';
+				dataArray[i].speed = Math.random() * (animationDuration/2000 - 0);
+				dataArray[i].title = "add" + i;
+				dataArray[i].message = generateUID();
+				++j;
+				++i;
+			}
+			console.log(dataArray)
 			return dataArray;
 		}
 
@@ -145,15 +208,10 @@
 			var arr = [];
 
 			var i = 0;
-
-			rowsMax = Math.ceil(stageHeight / minimumParticleSize);
-			colsMax = Math.ceil(stageWidth / minimumParticleSize);
-			rowsMin = Math.ceil(stageHeight / maximumParticleSize);
-			colsMin = Math.ceil(stageWidth / maximumParticleSize);
 		
-			while (i < rowsMax) {
+			while (i < rows) {
 				var j = 0;
-				while (j < colsMax) {
+				while (j < cols) {
 					var element = [j, i];
 					arr.push(element);
 					++j;
@@ -161,15 +219,13 @@
 				++i;
 			}
 
-			console.log(arr.length)
-
 			return arr;
 		}
 
 		function fillStage(arr) {
 
 			if (arr === undefined) {
-				arr = prefillArray(2500);
+				arr = prefillArray(dataArrayLength,1);
 			}
 			var placementArray = generateSlots(arr.length);
 			placementArray = shuffleArray(placementArray);
@@ -190,6 +246,9 @@
 				if (slot !== undefined) {
 					placementArray[i].push(slot.id);
 					dataPositionObject[posX + "." + posY] = slot.id;
+					if (slot.id === 'add') {
+						addPosition = posX + "." + posY;
+					}
 				}
 				if (slot !== undefined) {
 					renderParticle(posX, posY, currentParticleSize, slot.color, 0);
@@ -230,12 +289,33 @@
 			context.fill();
 		}
 
-		function load() {
+		function buildStage() {
+			generateDimensions();
 			buildCanvas();
 			fillStage();
 			animateStage();
+			console.log(addPosition)
 		}
+
+		function load() {
+			buildStage();
+		}
+
+
 		window.onload = load;
+
+		var resizeTimer;
+
+		window.addEventListener('resize', function(e) {
+
+			clearTimeout(resizeTimer);
+			resizeTimer = setTimeout(function() {
+
+				buildStage();
+
+			}, debounceTimeout);
+
+		});
 
 	</script>
 </body>
